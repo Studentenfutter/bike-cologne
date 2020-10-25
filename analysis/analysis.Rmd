@@ -1,0 +1,125 @@
+---
+title: "Impact of Covid19 cases on bike travel in Cologne"
+author: "Florian Gilberg"
+date: "19 10 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(covid19germany)
+library(tidyverse)
+library(runner)
+library(jsonlite)
+library(lubridate)
+library(plotly)
+```
+
+```{r echo=TRUE}
+# Import Covid Data
+covid_time <- covid19germany::get_RKI_timeseries()
+
+cgn <- covid_time %>% filter(Bundesland == "Nordrhein-Westfalen", Landkreis == "SK Köln")
+
+ # Get population numbers of CGN
+pop_koeln <- as.integer(covid19germany::ew_kreise %>% 
+   filter(IdLandkreis == 5315) %>% 
+   select(PopulationTotal))
+
+# Summarize the data
+
+cgn_sum <- cgn %>% select(Date, Bundesland, Landkreis, Age, Gender, NumberNewTestedIll, NumberNewDead, NumberNewRecovered) %>%  
+  group_by(Date) %>% 
+  summarise(Neue_Faelle = sum(NumberNewTestedIll), Neue_Todesfaelle = sum(NumberNewDead), Neu_Genesen = sum(NumberNewRecovered))
+
+# Inzidenzwert: sum(Neuinfektionen der letzten 7 Tage) / pop_koeln * 100000
+
+# Use runner package for moving window
+cgn_sum <- cgn_sum %>%   
+  mutate(Inzidenz_neue_faelle = sum_run(
+    x = cgn_sum$Neue_Faelle,
+    k = 7,
+    idx = as.Date(cgn_sum$Date)
+  ))
+
+cgn_Inzidenz <- cgn_sum %>% 
+  mutate(Inzidenzwert = (Inzidenz_neue_faelle / pop_koeln) * 100000 )
+```
+
+```{r echo=TRUE}
+# Plot the covid curve
+ggplot(cgn_Inzidenz) +
+  aes(x = Date, y = Inzidenzwert) +
+  geom_line(size = 1L, colour = "#0c4c8a") +
+  theme_minimal()
+
+ggplotly(width = 0.5)
+```
+
+```{r echo=TRUE}
+# Import Bike data
+# Import JSON files
+json_files <- list.files(path = "../data", pattern = ".*\\.json")
+
+for (i in json_files) {
+  file_name <- paste0("Zaehlstelle", gsub("\\.json", "", basename(i)))
+  file <- fromJSON(file.path("../data", i))
+  
+  # Convert to Date format
+  file$day <- ydm(file$day)
+  file$day <- as.POSIXct(file$day)
+  
+  file <- file %>% rename("Date" = day)
+  file <- file %>% rename_with(.fn = ~paste("Zaehlstelle", gsub("\\.json", "", i)), .cols = "count")
+  
+  assign(file_name, file)
+  
+  # Clean Up
+  rm(new_name)
+}
+
+# Unite bike countings with covid df
+bike_covid <- left_join(cgn_Inzidenz, Zaehlstelle0, by = "Date")
+bike_covid <- left_join(bike_covid, Zaehlstelle1, by = "Date")
+bike_covid <- left_join(bike_covid, Zaehlstelle2, by = "Date")
+bike_covid <- left_join(bike_covid, Zaehlstelle3, by = "Date")
+bike_covid <- left_join(bike_covid, Zaehlstelle4, by = "Date")
+bike_covid <- left_join(bike_covid, Zaehlstelle5, by = "Date")
+bike_covid <- left_join(bike_covid, Zaehlstelle6, by = "Date")
+bike_covid <- left_join(bike_covid, Zaehlstelle7, by = "Date")
+bike_covid <- left_join(bike_covid, Zaehlstelle8, by = "Date")
+bike_covid <- left_join(bike_covid, Zaehlstelle9, by = "Date")
+bike_covid <- left_join(bike_covid, Zaehlstelle10, by = "Date")
+bike_covid <- left_join(bike_covid, Zaehlstelle11, by = "Date")
+bike_covid <- left_join(bike_covid, Zaehlstelle12, by = "Date")
+```
+
+```{r echo=TRUE}
+# Plot
+library(plotly)
+bike_covid %>% 
+ggplot(aes(x = Date)) +
+  geom_line(aes(y=Inzidenzwert), size = 1L, colour = "#0c4c8a") +
+  geom_smooth(aes(y=`Zaehlstelle 0`), colour = "#e2265b") +
+  geom_smooth(aes(y=`Zaehlstelle 1`), colour = "#71265e") +
+  geom_smooth(aes(y=`Zaehlstelle 2`), colour = "#25354c") +
+  geom_smooth(aes(y=`Zaehlstelle 3`), colour = "#195054") +
+  geom_smooth(aes(y=`Zaehlstelle 4`), colour = "#008f86") +
+  geom_smooth(aes(y=`Zaehlstelle 5`), colour = "#48b1b5") +
+  geom_smooth(aes(y=`Zaehlstelle 6`), colour = "#ffd75a") +
+  geom_smooth(aes(y=`Zaehlstelle 7`), colour = "#e7a547") +
+  geom_smooth(aes(y=`Zaehlstelle 8`), colour = "#f86e53") +
+  geom_smooth(aes(y=`Zaehlstelle 9`), colour = "#f0b3ae") +
+  geom_smooth(aes(y=`Zaehlstelle 10`), colour = "#b2b2b2") +
+  geom_smooth(aes(y=`Zaehlstelle 11`), colour = "#363636") +
+  geom_smooth(aes(y=`Zaehlstelle 12`), colour = "#8cb749") +
+  scale_color_manual(values = colors) +
+  theme_minimal() 
+
+ggplotly(width = 0.5)
+
+
+# Todo: Ausschnitt auf April und aktueller Anstieg
+# Vergleich mit normalen Jahreszeitschwankungen
+```
+
