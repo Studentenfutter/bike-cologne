@@ -1,1 +1,2 @@
-Source: https://www.offenedaten-koeln.de/dataset/stadtgebiet-koeln
+Source of stadtbezirk.kmz: https://www.offenedaten-koeln.de/dataset/stadtgebiet-koeln
+Derived stadt.shp from projecting above file to ETRS 1989 UTM Zone N32, dissolving all districts, and filling in the holes.
